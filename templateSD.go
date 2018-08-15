@@ -74,6 +74,6 @@ func NewTemplate(x Template2) *Template {
 
 func main() {
 	fmt.Println("inicio")
-	perfectLink := NewTemplate()
-	perfectLink.req <- mensagemNoLink
+	// perfectLink := NewTemplate()
+	// perfectLink.req <- mensagemNoLink
 }
