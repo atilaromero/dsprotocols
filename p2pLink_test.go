@@ -12,11 +12,11 @@ func ExampleNewP2PLink() {
 	})
 
 	l := NewP2PLink(h)
-	l.req <- []byte("teste")
-	l.ind <- []byte("teste2")
-	close(l.req)
-	close(l.ind)
-	<-l.closed
+	l.Req <- []byte("teste")
+	l.Ind <- []byte("teste2")
+	close(l.Req)
+	close(l.Ind)
+	<-l.Closed
 	// Output:
 	// req: teste
 	// ind: teste2

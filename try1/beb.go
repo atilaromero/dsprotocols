@@ -1,4 +1,4 @@
-package main
+package try1
 
 import (
 	"reflect"

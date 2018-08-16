@@ -1,8 +1,8 @@
 package main
 
 type P2PLink struct {
-	req, ind chan []byte
-	closed   chan bool
+	Req, Ind chan []byte
+	Closed   chan bool
 }
 
 func NewP2PLink(h CommunicationHandler) P2PLink {
@@ -32,9 +32,9 @@ func NewP2PLink(h CommunicationHandler) P2PLink {
 		}
 	}()
 	return P2PLink{
-		req:    req,
-		ind:    ind,
-		closed: closed,
+		Req:    req,
+		Ind:    ind,
+		Closed: closed,
 	}
 }
 

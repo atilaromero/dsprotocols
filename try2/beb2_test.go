@@ -1,4 +1,4 @@
-package main
+package try2
 
 import "testing"
 
