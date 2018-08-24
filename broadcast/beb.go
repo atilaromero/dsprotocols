@@ -28,6 +28,7 @@ func NewBeb(pl link.Pl, numproc int) Beb {
 			case msg := <-beb.Req:
 				for q := 0; q < numproc; q++ {
 					pl.Req <- link.PlSendMsg{
+						Src: beb.Pl.ID,
 						Dst:     q,
 						Payload: msg.Payload,
 					}
