@@ -1,6 +1,8 @@
 package broadcast
 
 import (
+	"time"
+	"github.com/tarcisiocjr/dsprotocols/layer"
 	"github.com/tarcisiocjr/dsprotocols/link"
 	"fmt"
 )
@@ -24,4 +26,25 @@ func ExampleNewBeb() {
 	// 0: teste
 	// 1: teste
 	// 2: teste
+}
+
+func ExampleNewBeb2() {
+	plPool := make(map[int]layer.Layer)
+	bebPool := make(map[int]layer.Layer)
+	numproc := 3
+	for i := 0; i < numproc; i++ {
+		pl :=link.NewPl2(i, plPool)
+		beb := NewBeb2(i, bebPool, pl)
+		beb.UpponEvent("DELIVER", func(msg layer.Msg){
+			fmt.Printf("%s\n", string(msg.Payload))
+		})
+		plPool[i] = pl
+		bebPool[i] = beb
+	}
+	bebPool[0].Trigger(0, "BROADCAST", []byte("teste"))
+	time.Sleep(time.Second)
+	// Output:
+	// teste
+	// teste
+	// teste
 }

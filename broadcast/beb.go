@@ -1,6 +1,9 @@
 package broadcast
 
-import "github.com/tarcisiocjr/dsprotocols/link"
+import (
+	"github.com/tarcisiocjr/dsprotocols/layer"
+	"github.com/tarcisiocjr/dsprotocols/link"
+)
 
 type BebBroadcastMsg struct {
 	Payload []byte
@@ -28,7 +31,7 @@ func NewBeb(pl link.Pl, numproc int) Beb {
 			case msg := <-beb.Req:
 				for q := 0; q < numproc; q++ {
 					pl.Req <- link.PlSendMsg{
-						Src: beb.Pl.ID,
+						Src:     beb.Pl.ID,
 						Dst:     q,
 						Payload: msg.Payload,
 					}
@@ -41,5 +44,27 @@ func NewBeb(pl link.Pl, numproc int) Beb {
 			}
 		}
 	}(beb)
+	return beb
+}
+
+type Beb2 struct {
+	*layer.Struct
+	Pl2 link.Pl2
+}
+
+func NewBeb2(ID int, pool map[int]layer.Layer, pl2 link.Pl2) Beb2 {
+	var beb Beb2
+	beb = Beb2{
+		Struct: layer.New(ID, pool),
+		Pl2: pl2,
+	}
+	beb.UpponEvent("BROADCAST", func(msg layer.Msg) {
+		for q := 0; q < len(pl2.Pool); q++ {
+			pl2.Pool[q].Trigger(ID, "SEND", msg.Payload)
+		}
+	})
+	beb.Pl2.UpponEvent("DELIVER", func(msg layer.Msg){
+		beb.Trigger(ID, "DELIVER", msg.Payload)
+	})
 	return beb
 }
