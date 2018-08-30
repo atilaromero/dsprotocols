@@ -1,9 +1,5 @@
 package link
 
-import (
-	"github.com/tarcisiocjr/dsprotocols/layer"
-)
-
 type PlSendMsg struct {
 	Src     int
 	Dst     int
@@ -38,19 +34,5 @@ func NewPl(ID int, pls map[int]Pl) Pl {
 			}
 		}
 	}(pl)
-	return pl
-}
-
-type Pl2 struct {
-	*layer.Struct
-}
-
-func NewPl2(ID int, pool map[int]layer.Layer) Pl2 {
-	pl := Pl2{
-		Struct: layer.New(ID, pool),
-	}
-	pl.UpponEvent("SEND", func(msg layer.Msg) {
-		pool[msg.Dst].Trigger(ID, "DELIVER", msg.Payload)
-	})
 	return pl
 }

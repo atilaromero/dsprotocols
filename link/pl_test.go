@@ -1,10 +1,6 @@
 package link
 
-import (
-	"time"
-	"github.com/tarcisiocjr/dsprotocols/layer"
-	"fmt"
-)
+import "fmt"
 
 func ExampleNewPl() {
 	pls := make(map[int]Pl)
@@ -20,18 +16,3 @@ func ExampleNewPl() {
 	// Output:
 	// teste
 }
-
-
-func ExampleNewPl2() {
-	pls := make(map[int]layer.Layer)
-	// l0 := NewPl2(0, pls)
-	l1 := NewPl2(1, pls)
-	l1.Trigger(0, "SEND", []byte("payload"))
-	l1.UpponEvent("DELIVER", func(msg layer.Msg){
-		fmt.Println(string(msg.Payload))
-	})
-	time.Sleep(time.Second)
-	// Output:
-	// payload
-}
-
