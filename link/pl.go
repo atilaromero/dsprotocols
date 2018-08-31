@@ -34,10 +34,15 @@ type Pl struct {
 // pls is a, possibly empty, pool of all Pl. NewPl will modify this pool, incluing the new Pl in it.
 //
 // The requisition channel is used to receive messages from the upper layer.
+//   Ex: pl.Req <- msg
 // When a new message is received through Req,
-// that message's destination is found in the pool of perfect links (pls), and sent through the
-// indication channel. Is up to the upper layer to collect messages from the indication channel.
-// Beware, the indication channel will block if those messages aren't treated somehow.
+// that message's destination is seeked in the pool of perfect links (pls), and sent through the
+// indication channel.
+// Is up to the upper layer to collect messages from the indication channel.
+//   Ex: msg <- pl.Ind
+//
+// The indication channel will block if those messages aren't treated somehow.
+// To prevent that, create a go routine that continually reads from pl.Ind
 func NewPl(ID int, pls map[int]Pl) Pl {
 	req := make(chan PlSendMsg)
 	ind := make(chan PlDeliverMsg)

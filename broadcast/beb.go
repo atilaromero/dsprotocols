@@ -3,7 +3,6 @@ package broadcast
 import "github.com/tarcisiocjr/dsprotocols/link"
 
 // BebBroadcastMsg is a message to be broadcasted to all processes.
-// Even the sender receives a copy.
 type BebBroadcastMsg struct {
 	Payload []byte
 }
@@ -27,17 +26,21 @@ type Beb struct {
 }
 
 // NewBeb returns a Beb struct, which implements Best Effort Broadcast.
+// The sender also receives a copy of broadcasted messages.
 //
 // There are 4 channels here: the 2 channels from the perfect link
 // are used for inter process communication, while req and ind are used to
 // start and finish the broadcast.
 //
 // New broadcasts are initiated sending a message to the req channel.
+//   Ex: beb.Req <- msg
+//
 // When an ongoing broadcast is received from another process,
 // a deliver is triggered through the ind channel.
+//   Ex: msg <- beb.Ind
 //
-// Beb.Ind should be read from an upper layer, otherwise the ind
-// channel will stay blocked on the first message.
+// When using Beb, remember to create a go routine reading from the end channel beb.Ind and
+// treating incomming messages.
 func NewBeb(pl link.Pl, numproc int) Beb {
 	req := make(chan BebBroadcastMsg)
 	ind := make(chan BebDelivertMsg)
