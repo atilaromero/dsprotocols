@@ -9,6 +9,7 @@ import (
 
 	"github.com/tarcisiocjr/dsprotocols/broadcast"
 	"github.com/tarcisiocjr/dsprotocols/link"
+	"github.com/tarcisiocjr/dsprotocols/linksocket"
 )
 
 const conf = "conf.json"
@@ -18,16 +19,11 @@ type configuration struct {
 	Hosts   []string
 }
 
-type host struct {
-	ID   int
-	IP   [20]byte
-	port int
-	pid  int
-}
-
 func main() {
 	var operation bool
-	hosts := make(map[int]host)
+	var allClients map[*Client]int
+	allClients := make(map[*linksocket.Client]ints)
+	hosts := make(map[int]Host)
 	if len(os.Args) != 2 {
 		fmt.Fprintf(os.Stderr, "Usage: %s [socket|channel]\n", os.Args[0])
 		os.Exit(1)
@@ -61,6 +57,7 @@ func main() {
 			host := host{ix, arr, port, pid}
 			hosts[ix] = host
 			//fmt.Println(ix, tmp[0], port, arr)
+			linksocket.NewPlSocket(allClients, host)
 		}
 
 		for _, value := range hosts {

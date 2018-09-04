@@ -6,13 +6,6 @@ import (
 	"net"
 )
 
-var allClients map[*Client]int
-
-type BebDelivertMsg struct {
-	ID      int
-	Payload []byte
-}
-
 type Client struct {
 	// incoming chan string
 	outgoing   chan string
@@ -20,6 +13,13 @@ type Client struct {
 	writer     *bufio.Writer
 	conn       net.Conn
 	connection *Client
+}
+
+type Host struct {
+	ix   int
+	arr  [20]byte
+	port int
+	ind  int
 }
 
 func (client *Client) Read() {
@@ -37,7 +37,7 @@ func (client *Client) Read() {
 	}
 
 	client.conn.Close()
-	delete(allClients, client)
+	//delete(allClients, client)
 	if client.connection != nil {
 		client.connection.connection = nil
 	}
@@ -72,8 +72,7 @@ func NewClient(connection net.Conn) *Client {
 	return client
 }
 
-func NewPlSocket() {
-	allClients = make(map[*Client]int)
+func NewPlSocket(allClients map[*Client]int, Host *host) {
 	listener, _ := net.Listen("tcp", ":8080")
 	for {
 		conn, err := listener.Accept()
