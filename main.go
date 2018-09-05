@@ -1,77 +1,47 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	"log"
 	"os"
-	"strconv"
-	"strings"
 
 	"github.com/tarcisiocjr/dsprotocols/broadcast"
-	"github.com/tarcisiocjr/dsprotocols/link"
+	"github.com/tarcisiocjr/dsprotocols/linkchannel"
 	"github.com/tarcisiocjr/dsprotocols/linksocket"
 )
 
-const conf = "conf.json"
-
-type configuration struct {
-	Verbose bool
-	Hosts   []string
-}
+var confpeerAddr map[string]string
 
 func main() {
-	var operation bool
-	var allClients map[*Client]int
-	allClients := make(map[*linksocket.Client]ints)
-	hosts := make(map[int]Host)
-	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [socket|channel]\n", os.Args[0])
-		os.Exit(1)
+
+	confPeerAddr := map[string]string{
+		"1": "0.0.0.0:9991",
+		"2": "0.0.0.0:9992",
+		"3": "0.0.0.0:9993",
+		"4": "0.0.0.0:9994",
 	}
 
-	if strings.Compare(os.Args[1], "channel") == 0 {
-		operation = false
-	} else {
-		operation = true
+	if len(os.Args) < 2 {
+		log.Fatal("[Err] node ID required such as '1'")
 	}
 
-	if operation == true {
-		file, fileErr := os.Open(conf)
-		if fileErr != nil {
-			getOut(fileErr)
-		}
+	pl, err := linksocket.NewSocket(os.Args[1], confPeerAddr[os.Args[1]], "tcp4", os.Getpid(), confPeerAddr)
 
-		decoder := json.NewDecoder(file)
-		conf := configuration{}
-		err := decoder.Decode(&conf)
-		if err != nil {
-			fmt.Println("Error:", err)
-		}
+	if pl == nil {
+		log.Fatal(err)
+	}
 
-		for ix, ipPort := range conf.Hosts {
-			var arr [20]byte
-			tmp := strings.Split(ipPort, ":")
-			copy(arr[:], tmp[0])
-			port, _ := strconv.Atoi(tmp[1])
-			pid := os.Getpid()
-			host := host{ix, arr, port, pid}
-			hosts[ix] = host
-			//fmt.Println(ix, tmp[0], port, arr)
-			linksocket.NewPlSocket(allClients, host)
-		}
-
-		for _, value := range hosts {
-			fmt.Printf("%d %v %d %d\n", value.ID, value.IP, value.port, value.pid)
-		}
+	if err != nil {
+		log.Fatal(err)
 	} else {
 		// first, create a map of perfect links, using process ID as keys
-		pls := make(map[int]link.Pl)
+		pls := make(map[int]linkchannel.Pl)
 		numproc := 3 // sets the number of known processes
 
 		// creates and populate a slice of Bebs
 		bebs := []broadcast.Beb{}      // each process has a Beb instance, which has a Pl instance
 		for i := 0; i < numproc; i++ { // 'i' will be the process ID
-			pl := link.NewPl(i, pls) // when a new Pl is created, it adds itself to pls
+			pl := linkchannel.NewPl(i, pls) // when a new Pl is created, it adds itself to pls
 			bebs = append(bebs, broadcast.NewBeb(pl, numproc))
 		}
 
@@ -88,9 +58,4 @@ func main() {
 			fmt.Printf("%d: %s\n", msg.ID, string(msg.Payload))
 		}
 	}
-}
-
-func getOut(fileErr error) {
-	fmt.Printf("Cant open %s", conf)
-	os.Exit(1)
 }

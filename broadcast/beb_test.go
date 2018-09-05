@@ -3,18 +3,18 @@ package broadcast
 import (
 	"fmt"
 
-	"github.com/tarcisiocjr/dsprotocols/link"
+	"github.com/tarcisiocjr/dsprotocols/linkchannel"
 )
 
 func ExampleNewBeb() {
 	// first, create a map of perfect links, using process ID as key
-	pls := make(map[int]link.Pl)
+	pls := make(map[int]linkchannel.Pl)
 	numproc := 3 // sets the number of known processes
 
 	// creates and populate a slice of Bebs
 	bebs := []Beb{}                // each process has a Beb instance, which has a Pl instance
 	for i := 0; i < numproc; i++ { // 'i' will be the process ID
-		pl := link.NewPl(i, pls) // when a new Pl is created, it adds itself to pls
+		pl := linkchannel.NewPl(i, pls) // when a new Pl is created, it adds itself to pls
 		bebs = append(bebs, NewBeb(pl, numproc))
 	}
 

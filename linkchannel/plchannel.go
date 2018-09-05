@@ -1,4 +1,4 @@
-package link
+package linkchannel
 
 // PlSendMsg is used for requests.
 // These messages are intended to be created by the upper layer and sent to Pl.

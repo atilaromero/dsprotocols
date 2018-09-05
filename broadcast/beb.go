@@ -1,6 +1,6 @@
 package broadcast
 
-import "github.com/tarcisiocjr/dsprotocols/link"
+import "github.com/tarcisiocjr/dsprotocols/linkchannel"
 
 // BebBroadcastMsg is a message to be broadcasted to all processes.
 type BebBroadcastMsg struct {
@@ -20,7 +20,7 @@ type BebDelivertMsg struct {
 // Ind: deliver beb messages
 type Beb struct {
 	NumProc int
-	Pl      link.Pl
+	Pl      linkchannel.Pl
 	Req     chan BebBroadcastMsg
 	Ind     chan BebDelivertMsg
 }
@@ -41,7 +41,7 @@ type Beb struct {
 //
 // When using Beb, remember to create a go routine reading from the end channel beb.Ind and
 // treating incomming messages.
-func NewBeb(pl link.Pl, numproc int) Beb {
+func NewBeb(pl linkchannel.Pl, numproc int) Beb {
 	req := make(chan BebBroadcastMsg)
 	ind := make(chan BebDelivertMsg)
 	beb := Beb{numproc, pl, req, ind}
@@ -51,7 +51,7 @@ func NewBeb(pl link.Pl, numproc int) Beb {
 		for msg, ok := <-beb.Req; ok; msg, ok = <-beb.Req {
 			// send the message to all known processes through each one's perfect link
 			for q := 0; q < numproc; q++ {
-				pl.Req <- link.PlSendMsg{
+				pl.Req <- linkchannel.PlSendMsg{
 					Dst:     q,
 					Payload: msg.Payload,
 				}
