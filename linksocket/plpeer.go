@@ -7,7 +7,7 @@ import (
 
 // -----------------------------------------------------------------------------
 
-// Peer is a `struct` representing a remote `Bully`.
+// Peer is a `struct` representing a remote `PLSocket`.
 type Peer struct {
 	ID   string
 	addr string

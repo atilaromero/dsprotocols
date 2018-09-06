@@ -1,4 +1,4 @@
-package broadcast
+package broadcastchannel
 
 import "github.com/tarcisiocjr/dsprotocols/linkchannel"
 

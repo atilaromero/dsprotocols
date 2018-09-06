@@ -2,6 +2,7 @@ package linksocket
 
 import (
 	"encoding/gob"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -27,8 +28,8 @@ type PLSocket struct {
 	totalorderChan     chan Message
 }
 
-// "NewSocket returns a new `Socket` or an `error`.
-// NOTE: All connections to `Peer`s are established during this function.""
+// NewSocket returns a new `Socket` or an `error`.
+// NOTE: All connections to `Peer`s are established during this function.
 func NewSocket(ID, addr, proto string, pid int, peers map[string]string) (*PLSocket, error) {
 	pl := &PLSocket{
 		ID:                 ID,
@@ -55,6 +56,13 @@ func NewSocket(ID, addr, proto string, pid int, peers map[string]string) (*PLSoc
 	return pl, nil
 }
 
+func (pl *PLSocket) NewBebsocket() {
+	teste := []byte{'R', 'e', 'n', 'a', 'n'}
+	for _, rpl := range pl.peers.PeerData() {
+		_ = pl.Send(rpl.ID, rpl.Addr, 0, teste)
+	}
+}
+
 func (pl *PLSocket) receive(rwc io.ReadWriteCloser) {
 	var msg Message
 	dec := gob.NewDecoder(rwc)
@@ -69,7 +77,7 @@ func (pl *PLSocket) receive(rwc io.ReadWriteCloser) {
 			//	pl.Elect()
 			//}
 			break
-		} else if msg.Type == OK {
+		} else if msg.Type == 10000 {
 			select {
 			case pl.leaderChan <- msg:
 				continue
@@ -78,6 +86,7 @@ func (pl *PLSocket) receive(rwc io.ReadWriteCloser) {
 			}
 		} else {
 			pl.besteffortChan <- msg
+			fmt.Println("recebi a informacao")
 		}
 	}
 }
@@ -148,7 +157,7 @@ func (pl *PLSocket) Connect(proto string, peers map[string]string) (err error) {
 // `addr`. If no connection is reachable at `addr` or if `pl.peer[to]` does not
 // exist, the function retries five times and returns an `error` if it does not
 // succeed.
-func (pl *PLSocket) Send(to, addr string, what int) error {
+func (pl *PLSocket) Send(to, addr string, what int, payload []byte) error {
 	maxRetries := 5
 
 	if !pl.peers.Find(to) {
@@ -156,7 +165,7 @@ func (pl *PLSocket) Send(to, addr string, what int) error {
 	}
 
 	for attempts := 0; ; attempts++ {
-		err := pl.peers.Write(to, &Message{PeerID: pl.ID, Addr: pl.addr, Type: what})
+		err := pl.peers.Write(to, &Message{PeerID: pl.ID, Addr: pl.addr, Type: what, Payload: payload})
 		if err == nil {
 			break
 		}
@@ -168,3 +177,5 @@ func (pl *PLSocket) Send(to, addr string, what int) error {
 	}
 	return nil
 }
+
+// NewBebsocket function

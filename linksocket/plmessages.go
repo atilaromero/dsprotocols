@@ -17,7 +17,8 @@ const (
 
 // Message is a `struct` used for communication between `process`s.
 type Message struct {
-	PeerID string
-	Addr   string
-	Type   int
+	PeerID  string
+	Addr    string
+	Type    int
+	Payload []byte
 }
