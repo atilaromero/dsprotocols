@@ -1,6 +1,10 @@
-package broadcastchannel
+package broadcast
 
-import "github.com/tarcisiocjr/dsprotocols/linkchannel"
+import (
+	"log"
+
+	"github.com/tarcisiocjr/dsprotocols/link"
+)
 
 // BebBroadcastMsg is a message to be broadcasted to all processes.
 type BebBroadcastMsg struct {
@@ -20,7 +24,7 @@ type BebDelivertMsg struct {
 // Ind: deliver beb messages
 type Beb struct {
 	NumProc int
-	Pl      linkchannel.Pl
+	Pl      link.Link
 	Req     chan BebBroadcastMsg
 	Ind     chan BebDelivertMsg
 }
@@ -41,7 +45,7 @@ type Beb struct {
 //
 // When using Beb, remember to create a go routine reading from the end channel beb.Ind and
 // treating incomming messages.
-func NewBeb(pl linkchannel.Pl, numproc int) Beb {
+func NewBeb(pl link.Link, numproc int) Beb {
 	req := make(chan BebBroadcastMsg)
 	ind := make(chan BebDelivertMsg)
 	beb := Beb{numproc, pl, req, ind}
@@ -51,20 +55,21 @@ func NewBeb(pl linkchannel.Pl, numproc int) Beb {
 		for msg, ok := <-beb.Req; ok; msg, ok = <-beb.Req {
 			// send the message to all known processes through each one's perfect link
 			for q := 0; q < numproc; q++ {
-				pl.Req <- linkchannel.PlSendMsg{
-					Dst:     q,
-					Payload: msg.Payload,
+				err := pl.Send(q, msg.Payload)
+				if err != nil {
+					log.Fatal(err)
 				}
 			}
 		}
 	}()
 
 	go func() {
+		plInd := pl.GetDeliver()
 		// when receiving a broadcast from another process
-		for msg, ok := <-pl.Ind; ok; msg, ok = <-pl.Ind {
+		for msg, ok := <-plInd; ok; msg, ok = <-plInd {
 			// deliver the message one layer up
 			beb.Ind <- BebDelivertMsg{
-				ID:      pl.ID,
+				ID:      pl.ID(),
 				Payload: msg.Payload,
 			}
 		}
