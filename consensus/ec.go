@@ -1,12 +1,10 @@
 package consensus
 
 import (
-	"log"
-
-	"github.com/tarcisiocjr/dsprotocols/link"
-
 	"github.com/tarcisiocjr/dsprotocols/broadcast"
 	"github.com/tarcisiocjr/dsprotocols/leadership"
+	"github.com/tarcisiocjr/dsprotocols/link"
+	"log"
 )
 
 /*
