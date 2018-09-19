@@ -1,10 +1,11 @@
 package consensus
 
 import (
+	"log"
+
 	"github.com/tarcisiocjr/dsprotocols/broadcast"
 	"github.com/tarcisiocjr/dsprotocols/leadership"
 	"github.com/tarcisiocjr/dsprotocols/link"
-	"log"
 )
 
 /*
@@ -52,7 +53,7 @@ type Ec struct {
 	Ts             int
 }
 
-func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, totproc int) Ec {
+func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, totproc int) *Ec {
 	trusted := 0
 	lastts := 0
 	ts := pl.ID()
@@ -61,6 +62,12 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 	// upon event < Ω , Trust | p > do
 	go func() {
 		for p, ok := <-ec.LeaderDetector; ok; p, ok = <-ec.LeaderDetector {
+			if p.ID != ec.Trusted {
+				err := ec.Pl.Send(ec.Trusted, []byte("NACK"))
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
 			ec.Trusted = p.ID
 			if ec.Trusted == pl.ID() {
 				ec.Ts += ec.TotProc
@@ -95,5 +102,5 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 		}
 	}()
 
-	return ec
+	return &ec
 }
