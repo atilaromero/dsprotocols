@@ -11,9 +11,9 @@ type BebBroadcastMsg struct {
 	Payload []byte
 }
 
-// BebDelivertMsg contains the received brodcast message and the ID of the current process.
+// BebDelivertMsg contains the received brodcast message and the ID of the source process.
 type BebDelivertMsg struct {
-	ID      int
+	Src     int
 	Payload []byte
 }
 
@@ -69,7 +69,7 @@ func NewBeb(pl link.Link, numproc int) Beb {
 		for msg, ok := <-plInd; ok; msg, ok = <-plInd {
 			// deliver the message one layer up
 			beb.Ind <- BebDelivertMsg{
-				ID:      pl.ID(),
+				Src:     msg.Src,
 				Payload: msg.Payload,
 			}
 		}

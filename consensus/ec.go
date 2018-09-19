@@ -1,8 +1,14 @@
 package consensus
 
-import(
+import (
+	"log"
+
+	"github.com/tarcisiocjr/dsprotocols/link"
+
 	"github.com/tarcisiocjr/dsprotocols/broadcast"
+	"github.com/tarcisiocjr/dsprotocols/leadership"
 )
+
 /*
 	Properties of Epoch-change
 		EC1: Monotonicity: If a correct process starts an epoch (ts,l) and later starts
@@ -23,15 +29,10 @@ import(
 	makes p trust itself, p adds N to ts and sends a NEWEPOCH message with ts.
 */
 
-// EcBroadcastMsg is a message to be broadcasted to all processes.
-type EcBroadcastMsg struct {
-	Payload []byte
-}
-
 // EcDelivertMsg contains the received brodcast message and the ID of the current process.
 type EcDelivertMsg struct {
-	ID      int
-	Payload []byte
+	Ts     int
+	Leader int
 }
 
 // Ec (Epoch-change) is a struct that contains:
@@ -43,32 +44,55 @@ type EcDelivertMsg struct {
 // Lastts: last epoch started by the process
 // Ts: last timestamp attempted to start by the process
 type Ec struct {
-	NumProc int
-	Beb     broadcast.Beb
-	Req     chan EcBroadcastMsg
-	Ind     chan EcDelivertMsg
-	Trusted	int
-	Lastts	int
-	Ts		int
+	Pl             link.Link
+	Beb            broadcast.Beb
+	LeaderDetector <-chan leadership.TrustMsg
+	Ind            chan EcDelivertMsg
+	TotProc        int
+	Trusted        int
+	Lastts         int
+	Ts             int
 }
 
-func NewEc(beb broadcast.Beb, numproc int, trusted int, lastts int, ts int) Ec {
-	req := make(chan EcBroadcastMsg)
-	ind := make(chan EcDelivertMsg)
-	ec := Ec{numproc, beb, req, ind, trusted, lastts, ts}
+func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, totproc int) Ec {
+	trusted := 0
+	lastts := 0
+	ts := pl.ID()
+	ec := Ec{pl, beb, omega, make(chan EcDelivertMsg), totproc, trusted, lastts, ts}
 
-	bebs := []broadcast.Beb{}
+	// upon event < Ω , Trust | p > do
+	go func() {
+		for p, ok := <-ec.LeaderDetector; ok; p, ok = <-ec.LeaderDetector {
+			ec.Trusted = p.ID
+			if ec.Trusted == pl.ID() {
+				ec.Ts += ec.TotProc
+				beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte{byte(ec.Ts)}}
+			}
+		}
+	}()
+
+	// upon event < beb, Deliver | l , [ NEWEPOCH , newts ] > do
+	go func() {
+		for msg, ok := <-ec.Beb.Ind; ok; msg, ok = <-ec.Beb.Ind {
+			newts := int(msg.Payload[0])
+			if msg.Src == ec.Trusted && newts > ec.Lastts {
+				ec.Lastts = newts
+				ec.Ind <- EcDelivertMsg{Ts: newts, Leader: msg.Src}
+			} else {
+				err := ec.Pl.Send(msg.Src, []byte("NACK"))
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}
+	}()
 
 	go func() {
-		// on new ec request
-		for msg, ok := <-ec.Req; ok; msg, ok = <-ec.Req {
-			if trusted == 0 { // buscamos o id do processo em pl?
-				//ts := ts + numproc
-				for q := 0; q < numproc; q++{
-					bebs[0].Req <- broadcast.BebBroadcastMsg{
-						Payload: msg.Payload,
-					}
-				}
+		plInd := pl.GetDeliver()
+		for _, ok := <-plInd; ok; _, ok = <-plInd {
+			if ec.Trusted == pl.ID() {
+				ec.Ts += ec.TotProc
+				beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte{byte(ec.Ts)}}
 			}
 		}
 	}()

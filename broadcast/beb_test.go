@@ -29,12 +29,12 @@ func ExampleNewBeb() {
 		msg := <-bebs[i].Ind // the resulting broadcasted message is read from indication channel
 
 		// our treatment is just to print the message
-		fmt.Printf("%d: %s\n", msg.ID, string(msg.Payload))
+		fmt.Printf("%d: %s\n", msg.Src, string(msg.Payload))
 	}
 	// Output:
 	// 0: test
-	// 1: test
-	// 2: test
+	// 0: test
+	// 0: test
 }
 
 func TestNewBebWithSocket(t *testing.T) {
@@ -66,8 +66,8 @@ func TestNewBebWithSocket(t *testing.T) {
 		msg := <-bebs[i].Ind // the resulting broadcasted message is read from indication channel
 
 		// our treatment is just to print the message
-		if msg.ID != i {
-			t.Errorf("ID: expected %d; got %d", i, msg.ID)
+		if msg.Src != 0 {
+			t.Errorf("Src: expected %d; got %d", i, msg.Src)
 		}
 		if string(msg.Payload) != "test" {
 			t.Errorf("payload: expected %s; got %s", "test", string(msg.Payload))
