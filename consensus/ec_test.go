@@ -9,6 +9,7 @@ import (
 func ExampleNewEc() {
 	// first, create a map of perfect links, using process ID as key
 	pls := make(map[int]chan<- link.Message)
+	pls2 := make(map[int]chan<- link.Message)
 	numproc := 3 // sets the number of known processes
 
 	// creates and populate a slice of Ecs
@@ -16,7 +17,8 @@ func ExampleNewEc() {
 	for i := 0; i < numproc; i++ { 		// 'i' will be the process ID
 		pl := link.NewByChan(i, pls) 	// when a new Pl is created, it adds itself to pls
 		beb := broadcast.NewBeb(pl, numproc)
-		ecs = append(ecs, NewEc(pl, beb, nil, 0))
+		pl2 := link.NewByChan(i, pls2)
+		ecs = append(ecs, NewEc(pl2, beb, nil, 0))
 	}
 
 	// propose a epoch-change
