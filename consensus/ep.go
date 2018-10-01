@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"fmt"
+
 	"github.com/tarcisiocjr/dsprotocols/broadcast"
 	"github.com/tarcisiocjr/dsprotocols/link"
 )
@@ -32,16 +34,19 @@ import (
 
 // EpProposeMsg contains the value to be agreed
 type EpProposeMsg struct {
-	val int
+	Abort bool
+	Val   int
 }
 
 // EpDecideMsg contains the decided value
 type EpDecideMsg struct {
-	val int
+	Abort        bool
+	Val          int
+	AbortedState State
 }
 
 type State struct {
-	ValTS string
+	ValTS int
 	Val   int
 }
 
@@ -68,7 +73,7 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int) *Ep {
 
 	accepted := 0
 	tempval := 0
-	state := State{"", 0}
+	state := State{0, 0}
 
 	ep := Ep{
 		pl,
@@ -85,9 +90,34 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int) *Ep {
 
 	// upon event ⟨ ep, Propose | v ⟩ do
 	go func() {
-		for msg, ok := <-ep.Req; ok && ep.imLeader; msg, ok = <-ep.Req {
-			ep.Tempval = msg.val
+		for msg, ok := <-ep.Req; ok; msg, ok = <-ep.Req {
+			if !ep.imLeader {
+				continue
+			}
+			ep.Tempval = msg.Val
 			ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte("READ")}
+		}
+	}()
+
+	// upon event ⟨ beb, Deliver | l, [READ] ⟩ do
+	go func() {
+		for msg, ok := <-beb.Ind; ok; msg, ok = <-beb.Ind {
+			pl.Send(msg.Src, []byte(fmt.Sprintf("[STATE,%d,%d]\n", ep.State.ValTS, ep.State.Val)))
+			ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte("READ")}
+		}
+	}()
+
+	// upon event ⟨ pl, Deliver | q, [STATE, ts, v] ⟩ do
+	go func() {
+		ind := pl.GetDeliver()
+		for msg, ok := <-ind; ok; msg, ok = <-ind {
+			if !ep.imLeader {
+				continue
+			}
+			var ts int
+			var v int
+			fmt.Sscanf(string(msg.Payload), "[STATE,%d,%d]\n", &ts, &v)
+			ep.States[msg.Src] = State{ValTS: ts, Val: v}
 		}
 	}()
 

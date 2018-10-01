@@ -7,7 +7,7 @@ import (
 	"github.com/tarcisiocjr/dsprotocols/link"
 )
 
-func TesteNewEp(t *testing.T) {
+func TestNewEp(t *testing.T) {
 
 	pls := make(map[int]chan<- link.Message)
 	pls2 := make(map[int]chan<- link.Message)
