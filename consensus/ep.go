@@ -7,6 +7,8 @@ import (
 	"github.com/tarcisiocjr/dsprotocols/link"
 )
 
+const printLog bool = true
+
 /*
 	Properties of Epoch-consensus
 		EP1: Validity: If a correct process ep-decides v, then v was ep-proposed by the
@@ -65,15 +67,15 @@ type Ep struct {
 	State    State
 	Tempval  int
 	States   map[int]State
-	accepted int
-	imLeader bool
+	Accepted int
+	IsLeader bool
 }
 
-func NewEp(pl link.Link, beb broadcast.Beb, totproc int) *Ep {
+func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader bool) *Ep {
 
 	accepted := 0
 	tempval := 0
-	state := State{0, 0}
+	state := pState
 
 	ep := Ep{
 		pl,
@@ -85,39 +87,136 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int) *Ep {
 		tempval,
 		make(map[int]State),
 		accepted,
-		true,
+		pIsLeader,
 	}
 
 	// upon event ⟨ ep, Propose | v ⟩ do
 	go func() {
 		for msg, ok := <-ep.Req; ok; msg, ok = <-ep.Req {
-			if !ep.imLeader {
+			if !ep.IsLeader {
 				continue
 			}
 			ep.Tempval = msg.Val
+			if printLog {
+				fmt.Println("Broadcasting READ")
+			}
 			ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte("READ")}
 		}
 	}()
 
 	// upon event ⟨ beb, Deliver | l, [READ] ⟩ do
+	// OR
+	// upon event ⟨ beb, Deliver | l, [WRITE, v] ⟩ do
+	// OR
+	// upon event ⟨ beb, Deliver | l, [DECIDED, v] ⟩ do
 	go func() {
 		for msg, ok := <-beb.Ind; ok; msg, ok = <-beb.Ind {
-			pl.Send(msg.Src, []byte(fmt.Sprintf("[STATE,%d,%d]\n", ep.State.ValTS, ep.State.Val)))
-			ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte("READ")}
+
+			var v int
+			var ets int
+
+			ets = ep.State.ValTS // ????
+			v = -1
+
+			// if its a READ message
+			if string(msg.Payload) == "READ" {
+				if printLog {
+					fmt.Println("Sending STATE")
+				}
+				pl.Send(msg.Src, []byte(fmt.Sprintf("[STATE,%d,%d]\n", ep.State.ValTS, ep.State.Val)))
+				continue
+			}
+
+			fmt.Sscanf(string(msg.Payload), "[WRITE,%d]\n", &v)
+
+			// else if its a WRITE message
+			if v != -1 {
+				ep.State = State{ValTS: ets, Val: v}
+				if printLog {
+					fmt.Println(fmt.Sprintf("Received [WRITE,%d] ", v))
+				}
+				pl.Send(msg.Src, []byte("ACCEPT"))
+				continue
+			}
+
+			fmt.Sscanf(string(msg.Payload), "[DECIDED,%d]\n", &v)
+
+			// otherwise its a DECIDE message
+			if printLog {
+				fmt.Println(fmt.Sprintf("Received [DECIDED,%d]", v))
+			}
+			ep.Ind <- EpDecideMsg{Abort: false, Val: v, AbortedState: State{}}
 		}
 	}()
 
 	// upon event ⟨ pl, Deliver | q, [STATE, ts, v] ⟩ do
+	// OR
+	// upon event ⟨ pl, Deliver | q , [ACCEPT] ⟩
 	go func() {
 		ind := pl.GetDeliver()
 		for msg, ok := <-ind; ok; msg, ok = <-ind {
-			if !ep.imLeader {
+
+			if !ep.IsLeader {
 				continue
 			}
+
 			var ts int
 			var v int
+
+			// if its an ACCEPT message
+			if string(msg.Payload) == "ACCEPT" {
+				ep.Accepted = ep.Accepted + 1
+				if printLog {
+					fmt.Println(fmt.Sprintf("Received ACCEPTS: %d", ep.Accepted))
+				}
+				continue
+			}
+
+			// otherwise is a STATE message
 			fmt.Sscanf(string(msg.Payload), "[STATE,%d,%d]\n", &ts, &v)
+
+			if printLog {
+				fmt.Println(fmt.Sprintf("Received [STATE,%d,%d] from process %d", ts, v, msg.Src))
+			}
 			ep.States[msg.Src] = State{ValTS: ts, Val: v}
+		}
+	}()
+
+	go func() {
+		for {
+			// upon #( states ) > N/2 do
+			if len(ep.States) > ep.TotProc/2 {
+
+				// TODO:
+				/*
+					(ts, v) := highest ( states ) ;
+					if v = ⊥ then
+						tmpval := v ;
+					states := [⊥] N ;
+					trigger  beb, Broadcast | [ W RITE , tmpval ]  ;
+				*/
+
+				ep.Tempval = 1 // pegar o maior valor do states
+
+				ep.States = make(map[int]State)
+				if printLog {
+					fmt.Println("Broadcasting WRITE")
+				}
+				ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("[%s,%d]\n", "WRITE", ep.Tempval))}
+				break
+			}
+		}
+
+		//upon accepted > N/2 do
+		for {
+			if ep.Accepted > ep.TotProc/2 {
+				ep.Accepted = 0
+				if printLog {
+					fmt.Println("Broadcasting DECIDED")
+				}
+				ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("[DECIDED,%d]\n", ep.Tempval))}
+				break
+			}
 		}
 	}()
 
