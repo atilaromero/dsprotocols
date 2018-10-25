@@ -69,13 +69,24 @@ type Ep struct {
 	States   map[int]State
 	Accepted int
 	IsLeader bool
+	Aborted  bool
+}
+
+func highest(states map[int]State) int {
+	maxts := -1
+	for _, state := range states {
+		if state.ValTS > maxts {
+			maxts = state.ValTS
+		}
+	}
+	return maxts
 }
 
 func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader bool) *Ep {
 
-	accepted := 0
-	tempval := 0
-	state := pState
+	//upon event ⟨ ep, Init | state ⟩ do
+	var accepted int
+	var tempval = -1
 
 	ep := Ep{
 		pl,
@@ -83,19 +94,36 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader
 		make(chan EpDecideMsg),
 		make(chan EpProposeMsg),
 		totproc,
-		state,
+		pState,
 		tempval,
 		make(map[int]State),
 		accepted,
 		pIsLeader,
+		false,
 	}
 
 	// upon event ⟨ ep, Propose | v ⟩ do
+	// OR
+	// upon event ⟨ ep, Abort ⟩ do
 	go func() {
 		for msg, ok := <-ep.Req; ok; msg, ok = <-ep.Req {
+
+			// when receiving abort message
+			if msg.Abort {
+				ep.Aborted = true
+				if printLog {
+					fmt.Println("Aborting...")
+				}
+				ep.Ind <- EpDecideMsg{Abort: true, AbortedState: ep.State}
+				return
+			}
+
+			// only leader l
 			if !ep.IsLeader {
 				continue
 			}
+
+			// when leader received Propose message
 			ep.Tempval = msg.Val
 			if printLog {
 				fmt.Println("Broadcasting READ")
@@ -112,6 +140,11 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader
 	go func() {
 		for msg, ok := <-beb.Ind; ok; msg, ok = <-beb.Ind {
 
+			// when aborted, halt
+			if ep.Aborted {
+				return
+			}
+
 			var v int
 			var ets int
 
@@ -127,9 +160,8 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader
 				continue
 			}
 
-			fmt.Sscanf(string(msg.Payload), "[WRITE,%d]\n", &v)
-
 			// else if its a WRITE message
+			fmt.Sscanf(string(msg.Payload), "[WRITE,%d]\n", &v)
 			if v != -1 {
 				ep.State = State{ValTS: ets, Val: v}
 				if printLog {
@@ -139,9 +171,8 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader
 				continue
 			}
 
-			fmt.Sscanf(string(msg.Payload), "[DECIDED,%d]\n", &v)
-
 			// otherwise its a DECIDE message
+			fmt.Sscanf(string(msg.Payload), "[DECIDED,%d]\n", &v)
 			if printLog {
 				fmt.Println(fmt.Sprintf("Received [DECIDED,%d]", v))
 			}
@@ -156,6 +187,12 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader
 		ind := pl.GetDeliver()
 		for msg, ok := <-ind; ok; msg, ok = <-ind {
 
+			// when aborted, halt
+			if ep.Aborted {
+				return
+			}
+
+			// only leader l
 			if !ep.IsLeader {
 				continue
 			}
@@ -183,21 +220,24 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader
 	}()
 
 	go func() {
+
+		// upon #( states ) > N/2 do
 		for {
-			// upon #( states ) > N/2 do
+			// when aborted, halt
+			if ep.Aborted {
+				return
+			}
+
+			// only leader l
+			if !ep.IsLeader {
+				continue
+			}
+
 			if len(ep.States) > ep.TotProc/2 {
-
-				// TODO:
-				/*
-					(ts, v) := highest ( states ) ;
-					if v = ⊥ then
-						tmpval := v ;
-					states := [⊥] N ;
-					trigger  beb, Broadcast | [ W RITE , tmpval ]  ;
-				*/
-
-				ep.Tempval = 1 // pegar o maior valor do states
-
+				v := highest(ep.States)
+				if v != -1 {
+					ep.Tempval = v
+				}
 				ep.States = make(map[int]State)
 				if printLog {
 					fmt.Println("Broadcasting WRITE")
@@ -209,6 +249,16 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int, pState State, pIsLeader
 
 		//upon accepted > N/2 do
 		for {
+			// when aborted, halt
+			if ep.Aborted {
+				return
+			}
+
+			// only leader l
+			if !ep.IsLeader {
+				continue
+			}
+
 			if ep.Accepted > ep.TotProc/2 {
 				ep.Accepted = 0
 				if printLog {

@@ -28,6 +28,10 @@ func TestNewEp(t *testing.T) {
 		ep.Req <- EpProposeMsg{Abort: false, Val: 5}
 	}
 
-	time.Sleep(timeStep)
+	//for _, ep := range eps {
+	//	ep.Req <- EpProposeMsg{Abort: true, Val: -1}
+	//}
+
+	time.Sleep(time.Millisecond * 1000)
 
 }
