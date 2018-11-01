@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/tarcisiocjr/dsprotocols/broadcast"
@@ -62,6 +63,7 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 	// upon event < Ω , Trust | p > do
 	go func() {
 		for p, ok := <-ec.LeaderDetector; ok; p, ok = <-ec.LeaderDetector {
+			// from book's errata
 			if p.ID != ec.Trusted {
 				err := ec.Pl.Send(ec.Trusted, []byte("NACK"))
 				if err != nil {
@@ -71,7 +73,7 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 			ec.Trusted = p.ID
 			if ec.Trusted == pl.ID() {
 				ec.Ts += ec.TotProc
-				beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte{byte(ec.Ts)}}
+				beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("%d", ec.Ts))}
 			}
 		}
 	}()
@@ -79,7 +81,11 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 	// upon event < beb, Deliver | l , [ NEWEPOCH , newts ] > do
 	go func() {
 		for msg, ok := <-ec.Beb.Ind; ok; msg, ok = <-ec.Beb.Ind {
-			newts := int(msg.Payload[0])
+			newts := 0
+			_, err := fmt.Sscanf(string(msg.Payload), "%d", &newts)
+			if err != nil {
+				log.Fatal(err)
+			}
 			if msg.Src == ec.Trusted && newts > ec.Lastts {
 				ec.Lastts = newts
 				ec.Ind <- EcDelivertMsg{Ts: newts, Leader: msg.Src}
@@ -97,7 +103,7 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 		for _, ok := <-plInd; ok; _, ok = <-plInd {
 			if ec.Trusted == pl.ID() {
 				ec.Ts += ec.TotProc
-				beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte{byte(ec.Ts)}}
+				beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("%d", ec.Ts))}
 			}
 		}
 	}()

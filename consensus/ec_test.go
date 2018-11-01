@@ -33,7 +33,6 @@ func ExampleNewEc() (map[int]*Ec, map[int]chan leadership.TrustMsg) {
 			}
 		}(ecs[i].Ind)
 	}
-
 	return ecs, omegas
 }
 
@@ -159,6 +158,41 @@ func TestNewEc_d(t *testing.T) {
 
 	for j := 0; j < len(ecs); j++ {
 		if ecs[j].Trusted != 0 {
+			s := ""
+			for i := 0; i < len(ecs); i++ {
+				s += fmt.Sprintf("Epoch TS: %d, Leader: %v\n", ecs[i].Lastts, ecs[i].Trusted)
+			}
+			t.Errorf("Wrong leader:\n" + s)
+			break
+		}
+	}
+}
+
+func TestNewEc_e(t *testing.T) {
+	ecs, omegas := ExampleNewEc()
+
+	for n := 0; n < 300; n++ {
+		for i := 0; i < 3; i++ {
+			for l := 0; l < 3; l++ {
+				omegas[i] <- leadership.TrustMsg{ID: l}
+			}
+		}
+	}
+	time.Sleep(timeStep)
+
+	for j := 0; j < len(ecs); j++ {
+		if ecs[j].Lastts != ecs[0].Lastts {
+			s := ""
+			for i := 0; i < len(ecs); i++ {
+				s += fmt.Sprintf("Epoch TS: %d, Leader: %v\n", ecs[i].Lastts, ecs[i].Trusted)
+			}
+			t.Errorf("TS not unanimous:\n" + s)
+			break
+		}
+	}
+
+	for j := 0; j < len(ecs); j++ {
+		if ecs[j].Trusted != 2 {
 			s := ""
 			for i := 0; i < len(ecs); i++ {
 				s += fmt.Sprintf("Epoch TS: %d, Leader: %v\n", ecs[i].Lastts, ecs[i].Trusted)
