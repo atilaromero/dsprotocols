@@ -10,7 +10,7 @@ import (
 	"github.com/tarcisiocjr/dsprotocols/link"
 )
 
-const timeStep = 10 * time.Millisecond
+const timeStep = 150 * time.Millisecond
 
 func ExampleNewEc() (map[int]*Ec, map[int]chan leadership.TrustMsg) {
 	// first, create a map of perfect links, using process ID as key
