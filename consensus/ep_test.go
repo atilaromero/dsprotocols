@@ -40,18 +40,38 @@ func TestNewEp(t *testing.T) {
 		}
 	}
 
+	// reset all EPs
 	for _, ep := range eps {
 		ep.Req <- EpProposeMsg{Abort: true, Val: 200}
-		<-ep.Ind
+		<-ep.Ind //Abort indication
 	}
 	// time.Sleep(time.Millisecond * 100)
 
+	// reuse EPs to new consensus
 	ets = 1
 	leader = 2
 	for i, ep := range eps {
 		ep.Init(ets, leader)
 		ep.Req <- EpProposeMsg{Abort: false, Val: 1000 + i}
 	}
+
+	// time.Sleep(time.Millisecond * 300)
+	for _, ep := range eps {
+		msg := <-ep.Ind
+		expect := 1002
+		fmt.Println("Result: ", msg.Val)
+		if msg.Val != expect {
+			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.Val)
+		}
+	}
+
+	// change ets of only one process, value should be recovered (1002 instead of the proposed 300)
+	ets = 2
+	leader = 0
+	eps[0].Req <- EpProposeMsg{Abort: true, Val: 200}
+	<-eps[0].Ind //Abort indication
+	eps[0].Init(ets, leader)
+	eps[0].Req <- EpProposeMsg{Abort: false, Val: 300}
 
 	// time.Sleep(time.Millisecond * 300)
 	for _, ep := range eps {
