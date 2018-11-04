@@ -26,7 +26,7 @@ func TestNewEp(t *testing.T) {
 	ets := 0
 	leader := 1
 	for i, ep := range eps {
-		ep.Init(ets, leader)
+		ep.Init(leader, State{ValTS: ets, Val: -1})
 		ep.Req <- EpProposeMsg{Abort: false, Val: i + 100}
 	}
 
@@ -34,9 +34,9 @@ func TestNewEp(t *testing.T) {
 	for _, ep := range eps {
 		msg := <-ep.Ind
 		expect := 101
-		fmt.Println("Result: ", msg.Val)
-		if msg.Val != expect {
-			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.Val)
+		fmt.Println("Result: ", msg.State.Val)
+		if msg.State.Val != expect {
+			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.State.Val)
 		}
 	}
 
@@ -51,7 +51,7 @@ func TestNewEp(t *testing.T) {
 	ets = 1
 	leader = 2
 	for i, ep := range eps {
-		ep.Init(ets, leader)
+		ep.Init(leader, State{ValTS: ets, Val: -1})
 		ep.Req <- EpProposeMsg{Abort: false, Val: 1000 + i}
 	}
 
@@ -59,9 +59,9 @@ func TestNewEp(t *testing.T) {
 	for _, ep := range eps {
 		msg := <-ep.Ind
 		expect := 1002
-		fmt.Println("Result: ", msg.Val)
-		if msg.Val != expect {
-			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.Val)
+		fmt.Println("Result: ", msg.State.Val)
+		if msg.State.Val != expect {
+			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.State.Val)
 		}
 	}
 
@@ -70,16 +70,16 @@ func TestNewEp(t *testing.T) {
 	leader = 0
 	eps[0].Req <- EpProposeMsg{Abort: true, Val: 200}
 	<-eps[0].Ind //Abort indication
-	eps[0].Init(ets, leader)
+	eps[0].Init(leader, State{ValTS: ets, Val: -1})
 	eps[0].Req <- EpProposeMsg{Abort: false, Val: 300}
 
 	// time.Sleep(time.Millisecond * 300)
 	for _, ep := range eps {
 		msg := <-ep.Ind
 		expect := 1002
-		fmt.Println("Result: ", msg.Val)
-		if msg.Val != expect {
-			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.Val)
+		fmt.Println("Result: ", msg.State.Val)
+		if msg.State.Val != expect {
+			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.State.Val)
 		}
 	}
 }
