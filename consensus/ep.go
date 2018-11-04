@@ -73,7 +73,6 @@ type Ep struct {
 	Accepted int
 	Leader   int
 	Ets      int
-	Aborted  chan bool
 }
 
 func highest(states map[int]State) State {
@@ -107,12 +106,13 @@ func (ep *Ep) Init(ets int, leader int) {
 	ep.Accepted = 0
 	ep.Leader = leader
 	ep.Ets = ets
-	ep.Aborted = make(chan bool)
+
+	aborted := make(chan bool)
 
 	// upon event ⟨ ep, Propose | v ⟩ do
 	// OR
 	// upon event ⟨ ep, Abort ⟩ do
-	go func() {
+	go func(aborted chan bool) {
 		for msg, ok := <-ep.Req; ok; msg, ok = <-ep.Req {
 
 			// when receiving abort message
@@ -121,7 +121,7 @@ func (ep *Ep) Init(ets int, leader int) {
 				go func() {
 					ep.Ind <- EpDecideMsg{Abort: true, AbortedState: ep.State}
 				}()
-				close(ep.Aborted)
+				close(aborted)
 				return
 			}
 
@@ -130,24 +130,26 @@ func (ep *Ep) Init(ets int, leader int) {
 				continue
 			}
 
-			// when leader received Propose message
+			// upon event ⟨ ep, Propose | v ⟩ do
+			// 		tmpval := v ;
+			//		trigger < beb, Broadcast | [ READ ] > ;
 			ep.Tempval = msg.Val
 			comment("Broadcasting READ")
 			go func() {
 				ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte("READ 0")} //0 is a dummy value to make all 3 messages (READ, WRITE, and DECIDED) have the same format
 			}()
 		}
-	}()
+	}(aborted)
 
 	// upon event ⟨ beb, Deliver | l, [READ] ⟩ do
 	// OR
 	// upon event ⟨ beb, Deliver | l, [WRITE, v] ⟩ do
 	// OR
 	// upon event ⟨ beb, Deliver | l, [DECIDED, v] ⟩ do
-	go func() {
+	go func(aborted <-chan bool) {
 		for {
 			select {
-			case <-ep.Aborted:
+			case <-aborted:
 				return
 			case msg, ok := <-ep.Beb.Ind:
 				if !ok {
@@ -181,16 +183,16 @@ func (ep *Ep) Init(ets int, leader int) {
 				}
 			}
 		}
-	}()
+	}(aborted)
 
 	// upon event ⟨ pl, Deliver | q, [STATE, ts, v] ⟩ do
 	// OR
 	// upon event ⟨ pl, Deliver | q , [ACCEPT] ⟩
-	go func() {
+	go func(aborted <-chan bool) {
 		ind := ep.Pl.GetDeliver()
 		for {
 			select {
-			case <-ep.Aborted:
+			case <-aborted:
 				return
 			case msg, ok := <-ind:
 				if !ok {
@@ -240,5 +242,5 @@ func (ep *Ep) Init(ets int, leader int) {
 				}
 			}
 		}
-	}()
+	}(aborted)
 }
