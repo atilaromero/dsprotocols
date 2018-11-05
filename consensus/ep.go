@@ -91,6 +91,7 @@ func NewEp(pl link.Link, beb broadcast.Beb, totproc int) *Ep {
 		Ind:     make(chan EpDecideMsg),
 		Req:     make(chan EpProposeMsg),
 		TotProc: totproc,
+		State:   State{ValTS: -1, Val: -1},
 	}
 
 	return &ep
@@ -104,7 +105,7 @@ func (ep *Ep) Init(leader int, pState State) {
 	// 		states := [⊥] N ;
 	// 		accepted := 0 ;
 
-	ep.State = pState
+	ep.State.ValTS = pState.ValTS
 	ep.Tempval = -1
 	ep.States = make(map[int]State)
 	ep.Accepted = 0

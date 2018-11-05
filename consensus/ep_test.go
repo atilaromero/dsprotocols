@@ -58,7 +58,7 @@ func TestNewEp(t *testing.T) {
 	// time.Sleep(time.Millisecond * 300)
 	for _, ep := range eps {
 		msg := <-ep.Ind
-		expect := 1002
+		expect := 101
 		fmt.Println("Result: ", msg.State.Val)
 		if msg.State.Val != expect {
 			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.State.Val)
@@ -76,7 +76,7 @@ func TestNewEp(t *testing.T) {
 	// time.Sleep(time.Millisecond * 300)
 	for _, ep := range eps {
 		msg := <-ep.Ind
-		expect := 1002
+		expect := 101
 		fmt.Println("Result: ", msg.State.Val)
 		if msg.State.Val != expect {
 			t.Errorf("Wrong result. Expected %d, got %d", expect, msg.State.Val)
