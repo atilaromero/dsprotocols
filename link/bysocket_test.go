@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-func ExampleNewSocket() {
+func ExampleNewBySocket() {
 	peers := map[int]string{
 		0: ":10000",
 		1: ":10001",

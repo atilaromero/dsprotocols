@@ -25,7 +25,7 @@ func (l linkChannel) ID() int {
 	return l.id
 }
 
-// NewPl returns a new Pl struct. This implementations uses
+// NewByChan returns a new Pl struct. This implementations uses
 // only channels, instead of sockets, designed to be used in a non distributed environment (single machine).
 //
 // For a network implementation with similar behavior, see XXX...XXX

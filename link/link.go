@@ -8,8 +8,8 @@ type Message struct {
 	Payload []byte
 }
 
-// Pl is a struct that contains the ID of a process and 2 channels:
-// Pl receives messages from a upper layer through Req
+// Link is a struct that contains the ID of a process and 2 channels:
+// Link receives messages from a upper layer through Req
 // and deliver messages through Ind.
 type Link interface {
 	Send(id int, payload []byte) error
