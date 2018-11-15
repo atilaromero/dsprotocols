@@ -1,14 +1,13 @@
-package main
+package leadership
 
 import (
 	"fmt"
-
-	"./leadership"
+	"testing"
 )
 
-func main() {
+func TestLeaderDetector(t *testing.T) {
 	// start a leader detector for 10 processess
-	leader := leadership.NewLeaderDetector(10)
+	leader := NewLeaderDetector(10)
 
 	// when receiving a indication from leader detector
 	for msg, ok := <-leader.Ind; ok; msg, ok = <-leader.Ind {

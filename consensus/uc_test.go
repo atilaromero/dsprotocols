@@ -1,1 +1,5 @@
 package consensus
+
+func ExampleNewUc() {
+
+}

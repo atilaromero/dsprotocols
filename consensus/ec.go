@@ -55,9 +55,12 @@ type Ec struct {
 }
 
 func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, totproc int) *Ec {
+
+	//upon event < ec, Init > do
 	trusted := 0
 	lastts := 0
 	ts := pl.ID()
+
 	ec := Ec{pl, beb, omega, make(chan EcDelivertMsg), totproc, trusted, lastts, ts}
 
 	// upon event < Ω , Trust | p > do
@@ -98,6 +101,7 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 		}
 	}()
 
+	// upon event < pl, Deliver | p , [ NACK ] > do
 	go func() {
 		plInd := pl.GetDeliver()
 		for _, ok := <-plInd; ok; _, ok = <-plInd {

@@ -33,10 +33,6 @@ func comment(a ...interface{}) {
 		the epoch consensus has been aborted by some correct process.
 */
 
-/*
-	Description...
-*/
-
 // EpProposeMsg contains the value to be agreed
 type EpProposeMsg struct {
 	Abort bool
@@ -203,7 +199,7 @@ func (ep *Ep) Init(leader int, pState State) {
 						ep.Ind <- EpDecideMsg{Abort: false, State: ep.State}
 					}()
 				default:
-					log.Panic("unknow msgType", msgType)
+					log.Panic("unknown msgType", msgType)
 				}
 			}
 		}
