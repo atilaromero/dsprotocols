@@ -112,165 +112,170 @@ func (ep *Ep) Init(leader int, pState State) {
 	// upon event ⟨ ep, Propose | v ⟩ do
 	// OR
 	// upon event ⟨ ep, Abort ⟩ do
-	go func(aborted chan bool) {
-		for msg, ok := <-ep.Req; ok; msg, ok = <-ep.Req {
-
-			// upon event < ep, Abort > do
-			// 		trigger < ep, Aborted | ( valts , val ) > ;
-			// 		halt;
-			if msg.Abort {
-
-				comment("Aborting...")
-				go func() {
-					ep.Ind <- EpDecideMsg{Abort: true, State: ep.State}
-				}()
-				close(aborted)
-				return
-			}
-
-			// only leader l
-			if ep.Leader != ep.Pl.ID() {
-				continue
-			}
-
-			// upon event ⟨ ep, Propose | v ⟩ do
-			// 		tmpval := v ;
-			//		trigger < beb, Broadcast | [ READ ] > ;
-			ep.Tempval = msg.Val
-			comment("Broadcasting READ")
-			go func() {
-				ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte("READ 0 0")} //0 is a dummy value to make all 3 messages (READ, WRITE, and DECIDED) have the same format
-			}()
+	onRequest := func(msg EpProposeMsg, aborted chan bool) (ok bool) {
+		// upon event < ep, Abort > do
+		// 		trigger < ep, Aborted | ( valts , val ) > ;
+		// 		halt;
+		if msg.Abort {
+			comment("Aborting...")
+			go func(msg EpDecideMsg) {
+				ep.Ind <- msg
+			}(EpDecideMsg{Abort: true, State: ep.State})
+			close(aborted)
+			return false
 		}
-	}(aborted)
+
+		// only leader l
+		if ep.Leader != ep.Pl.ID() {
+			return true
+		}
+
+		// upon event ⟨ ep, Propose | v ⟩ do
+		// 		tmpval := v ;
+		//		trigger < beb, Broadcast | [ READ ] > ;
+		ep.Tempval = msg.Val
+		comment("Broadcasting READ")
+		go func(msg broadcast.BebBroadcastMsg) {
+			ep.Beb.Req <- msg
+			//0 is a dummy value to make all 3 messages (READ, WRITE, and DECIDED) have the same format
+		}(broadcast.BebBroadcastMsg{Payload: []byte("READ 0 0")})
+		return true
+	}
 
 	// upon event ⟨ beb, Deliver | l, [READ] ⟩ do
 	// OR
 	// upon event ⟨ beb, Deliver | l, [WRITE, v] ⟩ do
 	// OR
 	// upon event ⟨ beb, Deliver | l, [DECIDED, v] ⟩ do
-	go func(aborted <-chan bool) {
-		for {
-			select {
-			case <-aborted:
-				return
-			case msg, ok := <-ep.Beb.Ind:
-				if !ok {
-					panic(nil)
-				}
-
-				v := -1
-				vts := -1
-				msgType := ""
-				_, err := fmt.Sscanf(string(msg.Payload), "%s %d %d", &msgType, &vts, &v)
-				if err != nil {
-					log.Panic(err, ";Payload: ", string(msg.Payload), msg.Payload)
-				}
-
-				switch msgType {
-				// 	upon event < beb, Deliver | l , [ READ ] > do
-				// 		trigger < pl, Send | l , [ STATE , valts , val ] > ;
-				case "READ":
-					comment("Sending STATE")
-					ep.Pl.Send(msg.Src, []byte(fmt.Sprintf("STATE %d %d", ep.State.ValTS, ep.State.Val)))
-					continue
-				// upon event < beb, Deliver | l , [ WRITE , v] > do
-				// 		( valts , val ) := (ets, v) ;
-				// 		trigger < pl, Send | l , [ ACCEPT ] > ;
-				case "WRITE":
-					// ignore old ets
-					if vts < ep.State.ValTS {
-						continue
-					}
-					ep.State = State{ValTS: vts, Val: v}
-					comment(fmt.Sprintf("Received [WRITE,%d,%d] ", v, vts))
-					ep.Pl.Send(msg.Src, []byte("ACCEPT"))
-					continue
-				// upon event < beb, Deliver | l , [ DECIDED , v] > do
-				// 		trigger < ep, Decide | v > ;
-				case "DECIDED":
-					// ignore old ets
-					if vts < ep.State.ValTS {
-						continue
-					}
-					comment(fmt.Sprintf("Received [DECIDED,%d]", v))
-					ep.State = State{ValTS: vts, Val: v}
-					go func() {
-						ep.Ind <- EpDecideMsg{Abort: false, State: ep.State}
-					}()
-				default:
-					log.Panic("unknown msgType", msgType)
-				}
-			}
+	onBeb := func(msg broadcast.BebDelivertMsg) {
+		v := -1
+		vts := -1
+		msgType := ""
+		_, err := fmt.Sscanf(string(msg.Payload), "%s %d %d", &msgType, &vts, &v)
+		if err != nil {
+			log.Panic(err, ";Payload: ", string(msg.Payload), msg.Payload)
 		}
-	}(aborted)
+
+		switch msgType {
+		// 	upon event < beb, Deliver | l , [ READ ] > do
+		// 		trigger < pl, Send | l , [ STATE , valts , val ] > ;
+		case "READ":
+			comment("Sending STATE")
+			ep.Pl.Send(msg.Src, []byte(fmt.Sprintf("STATE %d %d", ep.State.ValTS, ep.State.Val)))
+			return
+		// upon event < beb, Deliver | l , [ WRITE , v] > do
+		// 		( valts , val ) := (ets, v) ;
+		// 		trigger < pl, Send | l , [ ACCEPT ] > ;
+		case "WRITE":
+			// ignore old ets
+			if vts < ep.State.ValTS {
+				return
+			}
+			ep.State = State{ValTS: vts, Val: v}
+			comment(fmt.Sprintf("Received [WRITE,%d,%d] ", v, vts))
+			ep.Pl.Send(msg.Src, []byte("ACCEPT"))
+			return
+		// upon event < beb, Deliver | l , [ DECIDED , v] > do
+		// 		trigger < ep, Decide | v > ;
+		case "DECIDED":
+			// ignore old ets
+			if vts < ep.State.ValTS {
+				return
+			}
+			comment(fmt.Sprintf("Received [DECIDED,%d]", v))
+			ep.State = State{ValTS: vts, Val: v}
+			go func(msg EpDecideMsg) {
+				ep.Ind <- msg
+			}(EpDecideMsg{Abort: false, State: ep.State})
+		default:
+			log.Panic("unknown msgType", msgType)
+		}
+	}
 
 	// upon event ⟨ pl, Deliver | q, [STATE, ts, v] ⟩ do
 	// OR
 	// upon event ⟨ pl, Deliver | q , [ACCEPT] ⟩
-	go func(aborted <-chan bool) {
+	onPl := func(msg link.Message) {
+		// only leader l
+		if ep.Leader != ep.Pl.ID() {
+			return
+		}
+
+		// upon event < pl, Deliver | q , [ ACCEPT ] > do
+		// 		accepted := accepted + 1 ;
+		if string(msg.Payload) == "ACCEPT" {
+			ep.Accepted = ep.Accepted + 1
+			comment(fmt.Sprintf("Received ACCEPTS: %d", ep.Accepted))
+			// upon accepted > N/2 do
+			// 		accepted := 0 ;
+			// 		trigger < beb, Broadcast | [ DECIDED , tmpval ] >  ;
+			if ep.Accepted > ep.TotProc/2 {
+				ep.Accepted = 0
+				comment("Broadcasting DECIDED")
+				go func(msg broadcast.BebBroadcastMsg) {
+					ep.Beb.Req <- msg
+				}(broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("DECIDED %d %d", ep.State.ValTS, ep.Tempval))})
+			}
+			return
+		}
+
+		// otherwise is a STATE message
+		// upon event < pl, Deliver | q , [ STATE , ts, v] > do
+		// 		states [q] := (ts, v) ;
+		var ts int
+		var v int
+		_, err := fmt.Sscanf(string(msg.Payload), "STATE %d %d", &ts, &v)
+		if err != nil {
+			panic(err)
+		}
+		comment(fmt.Sprintf("Received [STATE,%d,%d] from process %d", ts, v, msg.Src))
+		ep.States[msg.Src] = State{ValTS: ts, Val: v}
+
+		// upon #( states ) > N/2 do
+		// 		(ts, v) := highest ( states ) ;
+		// 		if v = ⊥ then
+		// 		tmpval := v ;
+		// 		states := [⊥] N ;
+		// 		trigger < beb, Broadcast | [ WRITE , tmpval ] > ;
+		if len(ep.States) > ep.TotProc/2 {
+			state := highest(ep.States)
+			if state.Val != -1 {
+				ep.Tempval = state.Val
+			}
+			ep.States = make(map[int]State)
+			comment("Broadcasting WRITE", ep.Tempval)
+			go func(msg broadcast.BebBroadcastMsg) {
+				ep.Beb.Req <- msg
+			}(broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("WRITE %d %d", ep.State.ValTS, ep.Tempval))})
+		}
+	}
+
+	go func(ep *Ep, aborted chan bool) {
 		ind := ep.Pl.GetDeliver()
 		for {
 			select {
 			case <-aborted:
 				return
+			case msg, ok := <-ep.Req:
+				if !ok {
+					return
+				}
+				ok = onRequest(msg, aborted)
+				if !ok {
+					return
+				}
+			case msg, ok := <-ep.Beb.Ind:
+				if !ok {
+					return
+				}
+				onBeb(msg)
+
 			case msg, ok := <-ind:
 				if !ok {
 					return
 				}
-				// only leader l
-				if ep.Leader != ep.Pl.ID() {
-					continue
-				}
-
-				// upon event < pl, Deliver | q , [ ACCEPT ] > do
-				// 		accepted := accepted + 1 ;
-				if string(msg.Payload) == "ACCEPT" {
-					ep.Accepted = ep.Accepted + 1
-					comment(fmt.Sprintf("Received ACCEPTS: %d", ep.Accepted))
-					// upon accepted > N/2 do
-					// 		accepted := 0 ;
-					// 		trigger < beb, Broadcast | [ DECIDED , tmpval ] >  ;
-					if ep.Accepted > ep.TotProc/2 {
-						ep.Accepted = 0
-						comment("Broadcasting DECIDED")
-						go func() {
-							ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("DECIDED %d %d", ep.State.ValTS, ep.Tempval))}
-						}()
-					}
-					continue
-				}
-
-				// otherwise is a STATE message
-				// upon event < pl, Deliver | q , [ STATE , ts, v] > do
-				// 		states [q] := (ts, v) ;
-				var ts int
-				var v int
-				_, err := fmt.Sscanf(string(msg.Payload), "STATE %d %d", &ts, &v)
-				if err != nil {
-					panic(err)
-				}
-				comment(fmt.Sprintf("Received [STATE,%d,%d] from process %d", ts, v, msg.Src))
-				ep.States[msg.Src] = State{ValTS: ts, Val: v}
-
-				// upon #( states ) > N/2 do
-				// 		(ts, v) := highest ( states ) ;
-				// 		if v = ⊥ then
-				// 		tmpval := v ;
-				// 		states := [⊥] N ;
-				// 		trigger < beb, Broadcast | [ WRITE , tmpval ] > ;
-				if len(ep.States) > ep.TotProc/2 {
-					state := highest(ep.States)
-					if state.Val != -1 {
-						ep.Tempval = state.Val
-					}
-					ep.States = make(map[int]State)
-					comment("Broadcasting WRITE", ep.Tempval)
-					go func() {
-						ep.Beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("WRITE %d %d", ep.State.ValTS, ep.Tempval))}
-					}()
-				}
+				onPl(msg)
 			}
 		}
-	}(aborted)
+	}(ep, aborted)
 }

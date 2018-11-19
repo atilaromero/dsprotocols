@@ -9,6 +9,7 @@ type linkChannel struct {
 func (l linkChannel) Send(id int, payload []byte) error {
 	// find destination in pool and fill Src with current process ID
 	go func() {
+		// fmt.Printf("SEND src:%d dst:%d '%s'\n", l.id, id, string(payload))
 		l.peers[id] <- Message{
 			Src:     l.id,
 			Payload: payload,

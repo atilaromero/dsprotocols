@@ -137,6 +137,8 @@ func maybePropose(uc *Uc) {
 		!uc.Proposed {
 
 		uc.Proposed = true
+		uc.EpInstance.Req <- EpProposeMsg{Abort: true, Val: uc.Val}
+		<-uc.EpInstance.Ind
 		uc.EpInstance.Init(uc.L, State{ValTS: uc.Ets, Val: -1})
 		uc.EpInstance.Req <- EpProposeMsg{Abort: false, Val: uc.Val}
 	}

@@ -64,53 +64,68 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 	ec := Ec{pl, beb, omega, make(chan EcDelivertMsg), totproc, trusted, lastts, ts}
 
 	// upon event < Ω , Trust | p > do
-	go func() {
-		for p, ok := <-ec.LeaderDetector; ok; p, ok = <-ec.LeaderDetector {
-			// from book's errata
-			if p.ID != ec.Trusted {
-				err := ec.Pl.Send(ec.Trusted, []byte("NACK"))
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-			ec.Trusted = p.ID
-			if ec.Trusted == pl.ID() {
-				ec.Ts += ec.TotProc
-				beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("%d", ec.Ts))}
-			}
-		}
-	}()
-
-	// upon event < beb, Deliver | l , [ NEWEPOCH , newts ] > do
-	go func() {
-		for msg, ok := <-ec.Beb.Ind; ok; msg, ok = <-ec.Beb.Ind {
-			newts := 0
-			_, err := fmt.Sscanf(string(msg.Payload), "%d", &newts)
+	onOmega := func(p leadership.TrustMsg) {
+		// from book's errata
+		if p.ID != ec.Trusted {
+			err := ec.Pl.Send(ec.Trusted, []byte("NACK"))
 			if err != nil {
 				log.Fatal(err)
 			}
-			if msg.Src == ec.Trusted && newts > ec.Lastts {
-				ec.Lastts = newts
-				ec.Ind <- EcDelivertMsg{Ts: newts, Leader: msg.Src}
-			} else {
-				err := ec.Pl.Send(msg.Src, []byte("NACK"))
-				if err != nil {
-					log.Fatal(err)
-				}
+		}
+		ec.Trusted = p.ID
+		if ec.Trusted == pl.ID() {
+			ec.Ts += ec.TotProc
+			beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("%d", ec.Ts))}
+		}
+	}
+
+	// upon event < beb, Deliver | l , [ NEWEPOCH , newts ] > do
+	onBeb := func(msg broadcast.BebDelivertMsg) {
+		newts := 0
+		_, err := fmt.Sscanf(string(msg.Payload), "%d", &newts)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if msg.Src == ec.Trusted && newts > ec.Lastts {
+			ec.Lastts = newts
+			ec.Ind <- EcDelivertMsg{Ts: newts, Leader: msg.Src}
+		} else {
+			err := ec.Pl.Send(msg.Src, []byte("NACK"))
+			if err != nil {
+				log.Fatal(err)
 			}
 		}
-	}()
+	}
 
 	// upon event < pl, Deliver | p , [ NACK ] > do
+	onPl := func(msg link.Message) {
+		if ec.Trusted == pl.ID() {
+			ec.Ts += ec.TotProc
+			beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("%d", ec.Ts))}
+		}
+	}
+
 	go func() {
 		plInd := pl.GetDeliver()
-		for _, ok := <-plInd; ok; _, ok = <-plInd {
-			if ec.Trusted == pl.ID() {
-				ec.Ts += ec.TotProc
-				beb.Req <- broadcast.BebBroadcastMsg{Payload: []byte(fmt.Sprintf("%d", ec.Ts))}
+		for {
+			select {
+			case p, ok := <-ec.LeaderDetector:
+				if !ok {
+					return
+				}
+				onOmega(p)
+			case msg, ok := <-ec.Beb.Ind:
+				if !ok {
+					return
+				}
+				onBeb(msg)
+			case msg, ok := <-plInd:
+				if !ok {
+					return
+				}
+				onPl(msg)
 			}
 		}
 	}()
-
 	return &ec
 }

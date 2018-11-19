@@ -51,26 +51,33 @@ func NewBeb(pl link.Link, numproc int) Beb {
 	beb := Beb{numproc, pl, req, ind}
 
 	go func() {
-		// on new broadcast request
-		for msg, ok := <-beb.Req; ok; msg, ok = <-beb.Req {
-			// send the message to all known processes through each one's perfect link
-			for q := 0; q < numproc; q++ {
-				err := pl.Send(q, msg.Payload)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-		}
-	}()
-
-	go func() {
 		plInd := pl.GetDeliver()
-		// when receiving a broadcast from another process
-		for msg, ok := <-plInd; ok; msg, ok = <-plInd {
-			// deliver the message one layer up
-			beb.Ind <- BebDelivertMsg{
-				Src:     msg.Src,
-				Payload: msg.Payload,
+		for {
+			select {
+			// on new broadcast request
+			case msg, ok := <-beb.Req:
+				if !ok {
+					return
+				}
+				// send the message to all known processes through each one's perfect link
+				for q := 0; q < numproc; q++ {
+					err := pl.Send(q, msg.Payload)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+			// when receiving a broadcast from another process
+			case msg, ok := <-plInd:
+				if !ok {
+					return
+				}
+				// deliver the message one layer up
+				go func() {
+					beb.Ind <- BebDelivertMsg{
+						Src:     msg.Src,
+						Payload: msg.Payload,
+					}
+				}()
 			}
 		}
 	}()
