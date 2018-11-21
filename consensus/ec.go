@@ -107,6 +107,7 @@ func NewEc(pl link.Link, beb broadcast.Beb, omega <-chan leadership.TrustMsg, to
 
 	go func() {
 		plInd := pl.GetDeliver()
+		defer close(ec.Ind)
 		for {
 			select {
 			case p, ok := <-ec.LeaderDetector:

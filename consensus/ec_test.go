@@ -40,7 +40,15 @@ func ExampleNewEc_a() {
 	ecs, omegas := ExampleNewEc()
 
 	omegas[0] <- leadership.TrustMsg{ID: 0}
+	omegas[1] <- leadership.TrustMsg{ID: 0}
+	omegas[2] <- leadership.TrustMsg{ID: 0}
+
 	time.Sleep(timeStep)
+
+	for j := 0; j < len(ecs); j++ {
+		close(omegas[j])
+		<-ecs[j].Ind
+	}
 
 	for i := 0; i < len(ecs); i++ {
 		fmt.Printf("Epoch TS: %d, Leader: %v\n", ecs[i].Lastts, ecs[i].Trusted)
@@ -61,6 +69,11 @@ func TestNewEc_b(t *testing.T) {
 	omegas[0] <- leadership.TrustMsg{ID: 1}
 	omegas[2] <- leadership.TrustMsg{ID: 1}
 	time.Sleep(timeStep)
+
+	for j := 0; j < len(ecs); j++ {
+		close(omegas[j])
+		<-ecs[j].Ind
+	}
 
 	for j := 0; j < len(ecs); j++ {
 		if ecs[j].Lastts != ecs[0].Lastts {
@@ -94,6 +107,11 @@ func TestNewEc_c(t *testing.T) {
 	omegas[2] <- leadership.TrustMsg{ID: 1}
 	omegas[1] <- leadership.TrustMsg{ID: 1}
 	time.Sleep(timeStep)
+
+	for j := 0; j < len(ecs); j++ {
+		close(omegas[j])
+		<-ecs[j].Ind
+	}
 
 	for j := 0; j < len(ecs); j++ {
 		if ecs[j].Lastts != ecs[0].Lastts {
@@ -146,6 +164,11 @@ func TestNewEc_d(t *testing.T) {
 	time.Sleep(timeStep)
 
 	for j := 0; j < len(ecs); j++ {
+		close(omegas[j])
+		<-ecs[j].Ind
+	}
+
+	for j := 0; j < len(ecs); j++ {
 		if ecs[j].Lastts != ecs[0].Lastts {
 			s := ""
 			for i := 0; i < len(ecs); i++ {
@@ -178,7 +201,13 @@ func TestNewEc_e(t *testing.T) {
 			}
 		}
 	}
+
 	time.Sleep(timeStep)
+
+	for j := 0; j < len(ecs); j++ {
+		close(omegas[j])
+		<-ecs[j].Ind
+	}
 
 	for j := 0; j < len(ecs); j++ {
 		if ecs[j].Lastts != ecs[0].Lastts {
