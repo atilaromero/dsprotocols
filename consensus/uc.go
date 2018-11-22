@@ -122,7 +122,6 @@ func (uc *Uc) Init() {
 				}
 				uc.Decided = true
 				uc.Ind <- UcDeliverMsg{msg.State.Val}
-				return
 			}
 		}
 	}()
